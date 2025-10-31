@@ -10,6 +10,5 @@ alles löschen:
 docker system prune -a
 
 anleitung:
-
-https://www.ionos.de/digitalguide/server/konfiguration/docker-prune/
-https://www.digitalocean.com/community/tutorials/how-to-remove-docker-images-containers-and-volumes-de
+1) https://www.ionos.de/digitalguide/server/konfiguration/docker-prune/
+2) https://www.digitalocean.com/community/tutorials/how-to-remove-docker-images-containers-and-volumes-de
