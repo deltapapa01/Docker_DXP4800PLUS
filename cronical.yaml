@@ -16,7 +16,7 @@ services:
       /bin/sh -c "apk add --no-cache bash docker && \
                   chmod 755 /opt/cronicle/bin/shell-plugin.js && \
                   exec /opt/cronicle/bin/docker-entrypoint.js"                 
-    env_file: docker-compose.env
+    env_file: cronical.env
     environment:
       - TZ=Europe/Berlin     
       - CRONICLE_base_app_url=http://192.168.10.20:3012
