@@ -1,0 +1,51 @@
+# Docker-Compose Datei für Cronicle auf UGREEN DXP4800PLUS
+# Quelle: Angepasst von https://github.com/soulteary/cronicle
+# Beschreibung: Cronicle ist ein verteiltes Job-Scheduling-System für die Ausführung von geplanten Aufgaben und Skripten.
+# Dokumentation: https://cronicle.net/docs/
+# Anleitung zur Installation: https://ugreen-forum.de/forum/thread/1692-tut-croincle-aufgabenplaner-f%C3%BCr-cronjobs/
+# docker-compose.env in das selbe Verzeichnis legen wie diese Datei und die Umgebungsvariablen dort eintragen.
+
+services:
+  cronicle:
+    # Community-gepflegtes Image, das als non-root laufen kann
+    image: soulteary/cronicle:0.9.80
+    container_name: cronicle
+    hostname: cronicle
+    restart: unless-stopped
+    entrypoint: |
+      /bin/sh -c "apk add --no-cache bash docker && \
+                  chmod 755 /opt/cronicle/bin/shell-plugin.js && \
+                  exec /opt/cronicle/bin/docker-entrypoint.js"                 
+    env_file: docker-compose.env
+    environment:
+      - TZ=Europe/Berlin     
+      - CRONICLE_base_app_url=http://192.168.10.20:3012
+      - CRONICLE_mail_options__secure=true
+      - CRONICLE_queue_dir=/opt/cronicle/data/queue    
+      
+    volumes:
+      - /volume1/docker/cronicle/data:/opt/cronicle/data
+      - /volume1/docker/cronicle/logs:/opt/cronicle/logs
+      - /volume1/docker/cronicle/plugins:/opt/cronicle/plugins
+      - /volume1/docker/cronicle/conf/emails:/opt/cronicle/conf/emails:ro 
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mappen ALLER Volumes
+      - /volume1:/app/volume1 
+      - /volume2:/app/volume2 
+      
+    ports:
+      - 3012:3012
+    networks:
+      - cronicle_default
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-sf", http://localhost:3012/api/app/status]
+      interval: 30s
+      retries: 3
+
+networks:
+  cronicle_default:
+    external: true
