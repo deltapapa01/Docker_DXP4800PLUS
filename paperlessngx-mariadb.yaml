@@ -12,7 +12,7 @@ services:
     image: docker.io/library/redis:8
 
     # Containername (nach Bedarf anpassen)
-    container_name: Paperlessngx-Redis
+    container_name: Paperless-ngx-Redis
     restart: unless-stopped
 
     # Sicherheitsoptionen
@@ -35,7 +35,7 @@ services:
     image: docker.io/library/mariadb:12
 
     # Containername (nach Bedarf anpassen)
-    container_name: Paperlessngx-MariaDB
+    container_name: Paperless-ngx-MariaDB
     restart: unless-stopped
 
     # Sicherheitsoptionen
@@ -76,7 +76,7 @@ services:
     image: phpmyadmin:latest
 
     # Containername (nach Bedarf anpassen)
-    container_name: Paperlessngx-phpMyAdmin
+    container_name: Paperless-ngx-phpMyAdmin
     restart: unless-stopped
 
     # Sicherheitsoptionen
@@ -99,7 +99,7 @@ services:
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
 
     # Containername (nach Bedarf anpassen)
-    container_name: Paperlessngx
+    container_name: Paperless-ngx
     restart: unless-stopped
 
     # Sicherheitsoptionen
