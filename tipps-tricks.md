@@ -1,3 +1,4 @@
+# Docker bereinigen:
 terminal einschalten via ssh
 einloggen
 

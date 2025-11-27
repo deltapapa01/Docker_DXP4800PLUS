@@ -10,3 +10,8 @@ Im Regelfall heißen die Dateien in Docker Compose docker-compose.yaml oder dock
 2) Paperless-NGX
     - paperlessngx-postgresql.yaml
     - paperlessngx.env
+
+# Kleine Scripte zur Datensicherung
+
+1) PaperlessNGX
+    - paperless-export.sh
