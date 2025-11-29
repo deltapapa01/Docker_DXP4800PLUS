@@ -1,5 +1,6 @@
 #!/bin/bash
-#Aufruf: sudo /home/deltapapa/scripts/paperlessngx/export.sh
+#Aufruf im Terminal // sudo /home/deltapapa/scripts/paperlessngx/export.sh
+#Aufruf im Crontab jeden Tag um 02:10 // 10 02 * * * sudo /home/deltapapa/scripts/paperlessngx/export.sh
 
 #Sollte das Script nicht mit Sudo aufgerufen werden, bricht es ab:
 if [ "$EUID" -ne 0 ]; then
@@ -43,7 +44,7 @@ docker exec "$CONTAINER_NAME" document_exporter "$BACKUP_DIR" -z > >(tee -a "${l
 
 # Zip Dateien die älter als Keep_Count sind löschen
 echo "Lösche Sicherungen in $TARGET_DIR, welche älter als $KEEP_COUNT Tage sind..." | tee -a "${logfile}"
-find $TARGET_DIR -name "*.zip" -type f -mtime +$KEEP_COUNT > >(tee -a "${logfile}") 2>&1
+find $TARGET_DIR -name "*.zip" -type f -mtime +$KEEP_COUNT -delete > >(tee -a "${logfile}") 2>&1
 
 # Abschlussmeldung
 echo "$(timestamp) - PaperlessNGX-Exporter abgeschlossen." | tee -a "${logfile}"
