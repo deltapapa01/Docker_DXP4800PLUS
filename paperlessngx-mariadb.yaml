@@ -2,8 +2,21 @@
 # Basiert auf: https://github.com/toafez/Tutorials
 # DACH Ugreen.Forum: https://ugreen-forum.de/forum/thread/1578-paperless-ngx-in-docker/?postID=22780#post22780
 # Credit an https://ugreen-forum.de/user/866-tommes/ für die Vorlage und Hilfestellung
+# Version vom 04.12.2025
+# - Anpassung der Pfade für persistente Daten
+# Version vom 23.10.2025
 # - Auslagerung sensibler Daten in paperlessngx.env Datei umgesetzt
 # - Anpassung: Tika und Gotenberg ausgebaut
+#
+# Verzeichnisstruktur sollte wie folgt aussehen:
+#   /docker
+#     /paperlessngx
+#       /data
+#       /media
+#       /export
+#       /consume
+#       /mariadb
+#       /redisdata
 
 services:
 
@@ -12,7 +25,7 @@ services:
     image: docker.io/library/redis:8
 
     # Containername (nach Bedarf anpassen)
-    container_name: Paperless-ngx-Redis
+    container_name: PaperlessNgx-Redis
     restart: unless-stopped
 
     # Sicherheitsoptionen
@@ -28,15 +41,17 @@ services:
 
     # Speicherort persistenter Daten (Pfad vor dem Doppelpunkt nach Bedarf anpassen)
     volumes:
-      - /volume1/docker/paperlessngx/redisdata:/data:rw
+      - /volume1/docker/paperlessngx-mdb/redisdata:/data:rw
 
 # MariaDB Container
   db:
     image: docker.io/library/mariadb:12
 
     # Containername (nach Bedarf anpassen)
-    container_name: Paperless-ngx-MariaDB
+    container_name: PaperlessNgx-MariaDB
     restart: unless-stopped
+    # Hostname des MariaDB-Containers (nach Bedarf anpassen)
+    hostname: paper-db
 
     # Sicherheitsoptionen
     security_opt:
@@ -56,27 +71,25 @@ services:
 
     # Speicherort persistenter Daten (Pfad vor dem Doppelpunkt nach Bedarf anpassen)
     volumes:
-      - /volume1/docker/paperlessngx/mariadb:/var/lib/mysql
+      - /volume1/docker/paperlessngx-mdb/mariadb:/var/lib/mysql
 
     # Umgebungsvariablen
     environment:
-      # Hostname des MariaDB-Containers (nach Bedarf anpassen)
-      MARIADB_HOST: mariadb
       # Datenbankname (nach Bedarf anpassen)
-      MARIADB_DATABASE: paperless
+      MYSQL_DATABASE: paperless
       # Datenbankbenutzer (nach Bedarf anpassen)
-      MARIADB_USER: paperlessuser
+      MYSQL_USER: paperlessuser
       # Datenbankpasswort (nach Bedarf anpassen)
-      MARIADB_PASSWORD: paperlesspass
+      MYSQL_PASSWORD: paperlesspass
       # Root-Passwort (nach Bedarf anpassen)
-      MARIADB_ROOT_PASSWORD: paperlessrootpass
+      MYSQL_ROOT_PASSWORD: rootpass
 
 # phpMyAdmin Container 
   phpmyadmin:
     image: phpmyadmin:latest
 
     # Containername (nach Bedarf anpassen)
-    container_name: Paperless-ngx-phpMyAdmin
+    container_name: PaperlessNgx-phpMyAdmin
     restart: unless-stopped
 
     # Sicherheitsoptionen
@@ -99,7 +112,7 @@ services:
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
 
     # Containername (nach Bedarf anpassen)
-    container_name: Paperless-ngx
+    container_name: PaperlessNgx
     restart: unless-stopped
 
     # Sicherheitsoptionen
@@ -108,7 +121,7 @@ services:
 
     # Weiterleitungsport (Port vor dem Doppelpunkt nach Bedarf anpassen)
     ports:
-      - "8118:8000"
+      - "8180:8000"
 
     # Festlegung der Reihenfolge und Ausführung weiterer Dienste-Abhängigkeiten
     depends_on:
@@ -125,10 +138,10 @@ services:
 
     # Speicherorte persistenter Daten (Pfade vor dem Doppelpunkt nach Bedarf anpassen)
     volumes:
-      - /volume1/docker/paperlessngx/data:/usr/src/paperless/data:rw
-      - /volume1/docker/paperlessngx/media:/usr/src/paperless/media:rw
-      - /volume1/docker/paperlessngx/export:/usr/src/paperless/export:rw
-      - /volume1/scan-input:/usr/src/paperless/consume:rw
+      - /volume1/docker/paperlessngx-mdb/data:/usr/src/paperless/data:rw
+      - /volume1/docker/paperlessngx-mdb/consume:/usr/src/paperless/consume:rw
+      - /volume1/docker/paperlessngx-mdb/export:/usr/src/paperless/export:rw
+      - /volume1/docker/paperlessngx-mdb/media:/usr/src/paperless/media:rw
 
     # docker-compose.env laden
     env_file: paperlessngx.env
@@ -141,13 +154,13 @@ services:
       # Umgebungsvariablen für den MariaDB-Container festlegen
       PAPERLESS_DBENGINE: mariadb
       # Hostname des MariaDB-Containers (entspricht dem Servicenamen "db")
-      PAPERLESS_DBHOST: db
+      PAPERLESS_DBHOST: paper-db
       # Datenbankname (entspricht der Variablen "MARIADB_DATABASE" im Abschnitt services: -> db: )
       PAPERLESS_DBNAME: paperless
       # Benutzername (entspricht der Variablen "MARIADB_USER" im Abschnitt services: -> db: )
       PAPERLESS_DBUSER: paperlessuser
       # Benutzername (entspricht der Variablen "MARIADB_PASSWORD" im Abschnitt services: -> db: )
-      PAPERLESS_DBPASS: paperlessrootpass
+      PAPERLESS_DBPASS: paperlesspass
       # Weiterleitungsport (entspricht der Variablen "ports:" im Abschnitt services: -> db: )
       PAPERLESS_DBPORT: 3306
 

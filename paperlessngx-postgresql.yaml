@@ -2,7 +2,21 @@
 # Basiert auf: https://github.com/toafez/Tutorials/blob/main/Paperless-ngx/PostgreSQL/paperlessngx-postgresql.yaml
 # Forumeintrag: https://ugreen-forum.de/forum/thread/1578-paperless-ngx-in-docker/?postID=21460#post21460
 # Credit an https://ugreen-forum.de/user/866-tommes/ für die Vorlage und Hilfestellung
+# Version 1.1 vom 04.12.2025
+# Anpassung der Pfade für persistente Daten
+# Version 1.0 vom 23.10.2025
 # Auslagerung sensibler Daten in paperlessngx.env Datei umgesetzt
+#
+# Die Verzeichnisstruktur sollte wie folgt aussehen:
+# /volume1
+#   /docker
+#     /paperless-ngx
+#       /data
+#       /media
+#       /export
+#       /consume
+#       /pgdata
+#       /redisdata
 
 services:
 
@@ -97,7 +111,7 @@ services:
       - /volume1/docker/paperless-ngx/data:/usr/src/paperless/data:rw
       - /volume1/docker/paperless-ngx/media:/usr/src/paperless/media:rw
       - /volume1/docker/paperless-ngx/export:/usr/src/paperless/export:rw
-      - /volume1/scan-input:/usr/src/paperless/consume:rw
+      - /volume1/docker/paperless-ngx/consume:/usr/src/paperless/consume:rw
 
     # docker-compose.env laden
     env_file: paperlessngx.env
