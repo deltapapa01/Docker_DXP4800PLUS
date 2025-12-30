@@ -1,0 +1,169 @@
+# Paperless-ngx:latest inklusive Redis 8 und MariaDB 12 auf UGREEN NAS
+# Basiert auf: https://github.com/toafez/Tutorials
+# DACH Ugreen.Forum: https://ugreen-forum.de/forum/thread/1578-paperless-ngx-in-docker/?postID=22780#post22780
+# Credit an https://ugreen-forum.de/user/866-tommes/ für die Vorlage und Hilfestellung
+# Version vom 04.12.2025
+# - Anpassung der Pfade für persistente Daten
+# Version vom 23.10.2025
+# - Auslagerung sensibler Daten in paperlessngx.env Datei umgesetzt
+# - Anpassung: Tika und Gotenberg ausgebaut
+#
+# Verzeichnisstruktur sollte wie folgt aussehen:
+#   /docker
+#     /paperlessngx
+#       /data
+#       /media
+#       /export
+#       /consume
+#       /mariadb
+#       /redisdata
+
+services:
+# Redis Container
+  broker:
+    image: docker.io/library/redis:8
+
+    # Containername (nach Bedarf anpassen)
+    container_name: PaperlessNgx-Redis
+    restart: unless-stopped
+
+    # Sicherheitsoptionen
+    security_opt:
+      - no-new-privileges:true
+
+    # Gesundheitscheck
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+    # Speicherort persistenter Daten (Pfad vor dem Doppelpunkt nach Bedarf anpassen)
+    volumes:
+      - /volume1/docker/paperlessngx-mdb/redisdata:/data:rw
+
+# MariaDB Container
+  db:
+    image: docker.io/library/mariadb:12
+
+    # Containername (nach Bedarf anpassen)
+    container_name: PaperlessNgx-MariaDB
+    restart: unless-stopped
+    # Hostname des MariaDB-Containers (nach Bedarf anpassen)
+    hostname: paper-db
+
+    # Sicherheitsoptionen
+    security_opt:
+      - no-new-privileges:true
+
+    # Weiterleitungsport (Port vor dem Doppelpunkt nach Bedarf anpassen)
+    ports:
+      - 3306:3306
+
+    # Gesundheitscheck
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+    # Speicherort persistenter Daten (Pfad vor dem Doppelpunkt nach Bedarf anpassen)
+    volumes:
+      - /volume1/docker/paperlessngx-mdb/mariadb:/var/lib/mysql
+
+    # Alle DB-Creds in paperlessngx.env
+    env_file: paperlessngx.env
+
+# phpMyAdmin Container 
+  phpmyadmin:
+    image: phpmyadmin:latest
+
+    # Containername (nach Bedarf anpassen)
+    container_name: PaperlessNgx-phpMyAdmin
+    restart: unless-stopped
+
+    # Sicherheitsoptionen
+    security_opt:
+      - no-new-privileges:true
+
+    # Weiterleitungsport (Port vor dem Doppelpunkt nach Bedarf anpassen)
+    ports:
+      - 2500:80
+
+    # Umgebungsvariablen
+    environment:
+      # Weiterleitungsport an den MariaDB-Container
+      PMA_PORT: 3306
+      # Servicename des MariaDB-Containers
+      PMA_HOST: db
+
+# Paperless-ngx Container
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+
+    # Containername (nach Bedarf anpassen)
+    container_name: PaperlessNgx
+    restart: unless-stopped
+
+    # Sicherheitsoptionen
+    security_opt:
+      - no-new-privileges:true
+
+    # Weiterleitungsport (Port vor dem Doppelpunkt nach Bedarf anpassen)
+    ports:
+      - "8180:8000"
+
+    # Festlegung der Reihenfolge und Ausführung weiterer Dienste-Abhängigkeiten
+    depends_on:
+      - db
+      - broker
+      - phpmyadmin
+
+    # Gesundheitscheck
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8000"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+
+    # Speicherorte persistenter Daten (Pfade vor dem Doppelpunkt nach Bedarf anpassen)
+    volumes:
+      - /volume1/docker/paperlessngx-mdb/data:/usr/src/paperless/data:rw
+      - /volume1/docker/paperlessngx-mdb/consume:/usr/src/paperless/consume:rw
+      - /volume1/docker/paperlessngx-mdb/export:/usr/src/paperless/export:rw
+      - /volume1/docker/paperlessngx-mdb/media:/usr/src/paperless/media:rw
+
+    # docker-compose.env laden
+    env_file: paperlessngx.env
+
+    # Umgebungsvariablen
+    environment:
+      # Umgebungsvariablen für den MariaDB-Container festlegen
+      PAPERLESS_DBENGINE: mariadb
+      # Hostname des MariaDB-Containers (entspricht dem Servicenamen "db")
+      PAPERLESS_DBHOST: paper-db
+      # Datenbankname (entspricht der Variablen "MARIADB_DATABASE" im Abschnitt services: -> db: )
+      PAPERLESS_DBNAME: paperless
+      # Benutzername (entspricht der Variablen "MARIADB_USER" im Abschnitt services: -> db: )
+      PAPERLESS_DBUSER: paperlessuser
+      # Benutzername (entspricht der Variablen "MARIADB_PASSWORD" im Abschnitt services: -> db: )
+      PAPERLESS_DBPASS: paperlesspass
+      # Weiterleitungsport (entspricht der Variablen "ports:" im Abschnitt services: -> db: )
+      PAPERLESS_DBPORT: 3306
+
+      # Umgebungsvariablen für den Paperless-ngx-Container festlegen
+      # Standard-OCR-Dateinamenformat (nach Bedarf anpassen)
+      PAPERLESS_FILENAME_FORMAT: '{{ created_year }}/{{ created }}-{{ correspondent }}-{{ document_type }}-{{ title }}'
+      # Entferne alle Platzhalter, die als "none" aufgelöst wurden.
+      PAPERLESS_FILENAME_FORMAT_REMOVE_NONE: true
+      # Überprüfen, ob der Dateiname ein gültiges Datum (YYYY-MM-DD) enthält. Ist dies der Fall, wird dieses anstelle des Datums im Dokument verwendet.
+      PAPERLESS_FILENAME_DATE_ORDER: YMD
+      # Entferne alle doppelten Dateien aus dem Ordner "Consume"
+      PAPERLESS_CONSUMER_DELETE_DUPLICATES: true
+      # Dateien in Unterordnern des Consumeordners erfassen
+      PAPERLESS_CONSUMER_RECURSIVE: true
+      # Ignoriere ein oder mehrere durch Kommas getrennte Datumsangaben in den Dokumenten (nach Bedarf anpassen)
+      PAPERLESS_IGNORE_DATES: "1970-01-01, 1970-12-31"
+      # Die digitale Signatur von PDF-Dokumenten ungültig machen, um die OCR-Verarbeitung zu ermöglichen
+      PAPERLESS_OCR_USER_ARGS: '{"invalidate_digital_signatures": true}'
