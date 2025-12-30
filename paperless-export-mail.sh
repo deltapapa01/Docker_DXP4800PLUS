@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # ==========================================================================
 # Aufruf z.B. mit:
 # Aufruf im Terminal // sudo /volume1/tools/scripts/paperlessngx/export.sh
@@ -19,8 +18,7 @@
 # https://www.facebook.com/groups/ugreennasyncdebenutzergruppe/
 # https://deltapapa.de/
 # Roman Glos for Ugreen NAS Community
-# PaperlessNgx Export -> versionierte ZIPs + optionale Mail
-
+# ==========================================================================
 
 set -Eeuo pipefail
 
