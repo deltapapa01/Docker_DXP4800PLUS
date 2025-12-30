@@ -1,27 +1,45 @@
 #!/bin/bash
+
+# ==========================================================================
+# Aufruf z.B. mit:
 # Aufruf im Terminal // sudo /volume1/tools/scripts/paperlessngx/export.sh
 # Aufruf im Crontab jeden Tag um 02:10 // 10 02 * * * sudo /volume1/tools/scripts/paperlessngx/export.sh
-# Paperless-ngx Export -> versionierte ZIPs + optionale Mail
-# Roman Glos for Ugreen NAS Community / deltapapa01 (Mail-Funktion ergänzt + robustere Export-Logik) v3
+# ==========================================================================
+# Anleitung um über SSH ohne Passwort zuzugreifen:
+# https://github.com/toafez/Tutorials/blob/main/SSH-Key_Linux_Kommandozeile.md
+# ==========================================================================
+# Versionen
+# v1.0 - Grundversion von https://github.com/deltapapa01 auf Basis von diesem Script: https://ugreen-forum.de/forum/thread/1692-tut-cronicle-aufgabenplaner-f%C3%BCr-cronjobs/?postID=27149#post27149
+# v2.0 - Logfile hinzugefügt -> Credit: Tommes from https://github.com/toafez
+# v3.0 - Mail-Funktion hinzugefügt
+# v4.0 - Mail-Funktion ergänzt + robustere Export-Logik
+# ==========================================================================
+# Mit Unterstützung von:
+# https://ugreen-forum.de/
+# https://www.facebook.com/groups/ugreennasyncdebenutzergruppe/
+# https://deltapapa.de/
+# Roman Glos for Ugreen NAS Community
+# PaperlessNgx Export -> versionierte ZIPs + optionale Mail
+
 
 set -Eeuo pipefail
 
 # =========================
 # Konfiguration
 # =========================
-CONTAINER_NAME="PaperlessNgx"                               # ggf. anpassen (docker ps --format '{{.Names}}')
+CONTAINER_NAME="PaperlessNgx"                              	# ggf. anpassen (docker ps --format '{{.Names}}')
 HOST_BACKUP_DIR="/volume1/docker/paperlessngx-mdb/export"   # HIER ändern (Host-Pfad)
-KEEP_FILES=10                                               # wie viele ZIPs behalten
+KEEP_FILES=7												# wie viele ZIPs behalten
 
 # Export-Ziel IM CONTAINER (NICHT Host!)
-CONTAINER_TMP_DIR="/usr/src/paperless/export/"   # im Container i.d.R. beschreibbar
+EXPORT_ROOT_CANDIDATES=( "/export" "/usr/src/paperless/export" )
 
 # =========================
 # Mail-Benachrichtigung (optional)
 # =========================
-MAIL_ENABLED=1           # 1 = Mail senden, 0 = deaktiviert
-MAIL_ON_SUCCESS=1        # 1 = auch bei Erfolg senden
-MAIL_ON_FAILURE=1        # 1 = bei Fehler senden
+MAIL_ENABLED=1          									# 1 = Mail senden, 0 = deaktiviert
+MAIL_ON_SUCCESS=1											# 1 = auch bei Erfolg senden
+MAIL_ON_FAILURE=1											# 1 = bei Fehler senden
 
 # SMTP Settings (curl)
 SMTP_HOST="server.com"					# SMTP Server
@@ -36,18 +54,13 @@ MAIL_TO="user@mail.de"					# Mail Adresse des Empfängers
 # Unicode-Icons in Mail (✅/❌) können je nach Mail-Client/Server falsch dargestellt werden,
 # wenn der Mail kein UTF-8 Charset mitgegeben wird. Wir setzen daher MIME-Header auf UTF-8.
 # Optional kannst du die Icons auch komplett auf ASCII umstellen.
-MAIL_ASCII_ICONS=0      # 1 = [OK]/[FAIL] statt ✅/❌
+MAIL_ASCII_ICONS=0						# 1 = [OK]/[FAIL] statt ✅/❌
+
 
 ICON_OK="✅"
 ICON_FAIL="❌"
-if [[ "${MAIL_ASCII_ICONS}" == "1" ]]; then
-  ICON_OK="[OK]"
-  ICON_FAIL="[FAIL]"
-fi
+if [[ "${MAIL_ASCII_ICONS}" == "1" ]]; then ICON_OK="[OK]"; ICON_FAIL="[FAIL]"; fi
 
-# =========================
-# Helper
-# =========================
 timestamp() { date +"%Y-%m-%d %H:%M:%S"; }
 
 absolute_path=$(dirname -- "$(readlink -fn -- "$0")")
@@ -62,19 +75,15 @@ pick_port() {
 
 send_mail() {
   [[ "${MAIL_ENABLED}" != "1" ]] && return 0
-  command -v curl >/dev/null 2>&1 || { echo "WARN: curl nicht gefunden -> keine Mail gesendet." | tee -a "$logfile"; return 0; }
+  command -v curl >/dev/null 2>&1 || { echo "WARN: curl not found -> no mail." | tee -a "$logfile"; return 0; }
 
-  local subject="$1"
-  local body="$2"
-  local port url
+  local subject="$1" body="$2" port url
   port="$(pick_port)"
 
-  # bessere Header (reduziert Spam-Score oft deutlich)
   local now_rfc2822 msg_id tmp
   now_rfc2822="$(LC_ALL=C date -R)"
   msg_id="<$(date +%s).$$.$(hostname)@${MAIL_FROM#*@}>"
 
-  # Subject korrekt MIME-encoden, falls Nicht-ASCII enthalten ist
   local subject_hdr="$subject"
   if LC_ALL=C printf '%s' "$subject" | grep -q '[^ -~]'; then
     if command -v base64 >/dev/null 2>&1; then
@@ -94,7 +103,6 @@ send_mail() {
     echo "MIME-Version: 1.0"
     echo "Content-Type: text/plain; charset=UTF-8"
     echo "Content-Transfer-Encoding: 8bit"
-    echo "X-Mailer: bash/curl"
     echo
     printf "%b\n" "$body"
   } >"$tmp"
@@ -125,13 +133,43 @@ send_mail() {
 }
 
 fail() {
-  local rc=$1
-  shift || true
+  local rc=$1; shift || true
   echo "$(timestamp) - FEHLER (rc=$rc): $*" | tee -a "$logfile"
   if [[ "${MAIL_ON_FAILURE}" == "1" ]]; then
-    send_mail "Paperless Export FEHLER (rc=$rc)" "${ICON_FAIL} Paperless Export fehlgeschlagen: $(timestamp)\nHost: $(hostname)\nContainer: ${CONTAINER_NAME}\nHost-Backup-Dir: ${HOST_BACKUP_DIR}\nLog: ${logfile}\n\nLetzte Zeilen:\n$(tail -n 200 "$logfile" 2>/dev/null)"
+    send_mail "Paperless Export FEHLER (rc=$rc)" \
+"${ICON_FAIL} Paperless Export fehlgeschlagen: $(timestamp)
+Host: $(hostname)
+Container: ${CONTAINER_NAME}
+Host-Backup-Dir: ${HOST_BACKUP_DIR}
+Log: ${logfile}
+
+Letzte Zeilen:
+$(tail -n 200 "$logfile" 2>/dev/null)"
   fi
   exit "$rc"
+}
+
+run_exporter() {
+  # A) document_exporter wrapper needs /command in PATH
+  echo "$(timestamp) - Export-Methode A: document_exporter (PATH=/command)" | tee -a "$logfile"
+  if docker exec "$CONTAINER_NAME" sh -lc "export PATH=/command:\$PATH; document_exporter '$CONTAINER_TMP_DIR' -z" >>"$logfile" 2>&1; then
+    return 0
+  fi
+
+  # B) Fallback: manage.py direct
+  echo "$(timestamp) - Export-Methode B (Fallback): python manage.py document_exporter" | tee -a "$logfile"
+  docker exec "$CONTAINER_NAME" sh -lc "
+    set -e
+    PY=python3; command -v python3 >/dev/null 2>&1 || PY=python
+    for P in /usr/src/paperless/src/manage.py /usr/src/paperless/manage.py; do
+      if [ -f \"\$P\" ]; then
+        \"\$PY\" \"\$P\" document_exporter '$CONTAINER_TMP_DIR' -z
+        exit 0
+      fi
+    done
+    echo 'manage.py nicht gefunden (Fallback gescheitert)' >&2
+    exit 1
+  " >>"$logfile" 2>&1
 }
 
 # =========================
@@ -142,32 +180,55 @@ echo "$(timestamp) - starte PaperlessNGX-Exporter" | tee -a "$logfile"
 mkdir -p "$HOST_BACKUP_DIR" || fail 2 "Kann Host Backup Dir nicht anlegen: $HOST_BACKUP_DIR"
 
 if ! docker ps --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
-  echo "$(timestamp) - Container '$CONTAINER_NAME' nicht gefunden. Ausgabe von docker ps:" | tee -a "$logfile"
   docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' | tee -a "$logfile" || true
-  fail 3 "Container nicht gefunden"
+  fail 3 "Container nicht gefunden: $CONTAINER_NAME"
 fi
 
-ARCHIVE_NAME="paperless_export_$(date +%Y%m%d_%H%M%S).zip"
-HOST_ARCHIVE_PATH="${HOST_BACKUP_DIR}/${ARCHIVE_NAME}"
+# --- Auto-detect export root in container
+CONTAINER_EXPORT_ROOT=""
+for cand in "${EXPORT_ROOT_CANDIDATES[@]}"; do
+  if docker exec "$CONTAINER_NAME" sh -lc "[ -d '$cand' ]" >/dev/null 2>&1; then
+    CONTAINER_EXPORT_ROOT="$cand"
+    break
+  fi
+done
+[[ -z "$CONTAINER_EXPORT_ROOT" ]] && fail 4 "Kein Export-Root gefunden (geprüft: ${EXPORT_ROOT_CANDIDATES[*]})"
 
+CONTAINER_TMP_DIR="${CONTAINER_EXPORT_ROOT%/}/_tmp"
+
+# Prepare tmp (never remove mountpoint, only subdir)
 if ! docker exec "$CONTAINER_NAME" sh -lc "rm -rf '$CONTAINER_TMP_DIR' && mkdir -p '$CONTAINER_TMP_DIR'" >>"$logfile" 2>&1; then
   fail 4 "Kann Export-Tmp im Container nicht vorbereiten: $CONTAINER_TMP_DIR"
 fi
 
-echo "$(timestamp) - Starte document_exporter im Container..." | tee -a "$logfile"
-if ! docker exec "$CONTAINER_NAME" sh -lc "document_exporter '$CONTAINER_TMP_DIR' -z" >>"$logfile" 2>&1; then
-  fail 5 "document_exporter fehlgeschlagen"
-fi
+ARCHIVE_NAME="paperless_export_$(date +%Y%m%d_%H%M%S).zip"
+HOST_ARCHIVE_PATH="${HOST_BACKUP_DIR%/}/${ARCHIVE_NAME}"
 
-if ! docker cp "${CONTAINER_NAME}:${CONTAINER_TMP_DIR}/export.zip" "$HOST_ARCHIVE_PATH" >>"$logfile" 2>&1; then
-  fail 6 "docker cp fehlgeschlagen (export.zip nicht gefunden?)"
+echo "$(timestamp) - Starte Export im Container..." | tee -a "$logfile"
+run_exporter || fail 5 "document_exporter fehlgeschlagen"
+
+# --- Find newest ZIP in tmp (name may be export-YYYY-MM-DD.zip etc.)
+CONTAINER_ZIP="$(docker exec "$CONTAINER_NAME" sh -lc "ls -1t '$CONTAINER_TMP_DIR'/*.zip 2>/dev/null | head -n1" | tr -d '\r')"
+[[ -z "$CONTAINER_ZIP" ]] && fail 6 "Keine ZIP im Container gefunden in: $CONTAINER_TMP_DIR"
+
+ZIP_BASENAME="$(basename "$CONTAINER_ZIP")"
+HOST_TMP_ZIP="${HOST_BACKUP_DIR%/}/_tmp/${ZIP_BASENAME}"
+
+# Prefer host-move if bind mount is present and file exists on host
+if [[ -f "$HOST_TMP_ZIP" ]]; then
+  mv -f "$HOST_TMP_ZIP" "$HOST_ARCHIVE_PATH" >>"$logfile" 2>&1 || fail 6 "Host-move fehlgeschlagen: $HOST_TMP_ZIP -> $HOST_ARCHIVE_PATH"
+else
+  docker cp "${CONTAINER_NAME}:${CONTAINER_ZIP}" "$HOST_ARCHIVE_PATH" >>"$logfile" 2>&1 || fail 6 "docker cp fehlgeschlagen: ${CONTAINER_ZIP}"
 fi
 
 echo "$(timestamp) - Export erstellt: $HOST_ARCHIVE_PATH" | tee -a "$logfile"
 
+# Cleanup tmp
 docker exec "$CONTAINER_NAME" sh -lc "rm -rf '$CONTAINER_TMP_DIR'" >>"$logfile" 2>&1 || true
+rm -rf "${HOST_BACKUP_DIR%/}/_tmp" >>"$logfile" 2>&1 || true
 
-mapfile -t files < <(ls -1t "${HOST_BACKUP_DIR}"/paperless_export_*.zip 2>/dev/null || true)
+# Retention
+mapfile -t files < <(ls -1t "${HOST_BACKUP_DIR%/}"/paperless_export_*.zip 2>/dev/null || true)
 if (( ${#files[@]} > KEEP_FILES )); then
   echo "$(timestamp) - Retention: behalte $KEEP_FILES ZIPs, lösche ${#files[@]}-${KEEP_FILES}" | tee -a "$logfile"
   for ((i=KEEP_FILES; i<${#files[@]}; i++)); do
@@ -177,7 +238,15 @@ fi
 
 echo "$(timestamp) - PaperlessNGX-Exporter abgeschlossen." | tee -a "$logfile"
 if [[ "${MAIL_ON_SUCCESS}" == "1" ]]; then
-  send_mail "Paperless Export OK" "${ICON_OK} Paperless Export erfolgreich: $(timestamp)\nHost: $(hostname)\nContainer: ${CONTAINER_NAME}\nBackup: ${HOST_ARCHIVE_PATH}\nLog: ${logfile}\n\nLetzte Zeilen:\n$(tail -n 80 "$logfile" 2>/dev/null)"
+  send_mail "Paperless Export OK" \
+"${ICON_OK} Paperless Export erfolgreich: $(timestamp)
+Host: $(hostname)
+Container: ${CONTAINER_NAME}
+Backup: ${HOST_ARCHIVE_PATH}
+Log: ${logfile}
+
+Letzte Zeilen:
+$(tail -n 80 "$logfile" 2>/dev/null)"
 fi
 
 exit 0
