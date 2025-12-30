@@ -1,6 +1,21 @@
 #!/bin/bash
-#Aufruf im Terminal // sudo /home/deltapapa/scripts/paperlessngx/export.sh
-#Aufruf im Crontab jeden Tag um 02:10 // 10 02 * * * sudo /home/deltapapa/scripts/paperlessngx/export.sh
+# ==========================================================================
+# Aufruf z.B. mit:
+# Aufruf im Terminal // sudo /volume1/tools/scripts/paperlessngx/export.sh
+# Aufruf im Crontab jeden Tag um 02:10 // 10 02 * * * sudo /volume1/tools/scripts/paperlessngx/export.sh
+# ==========================================================================
+# Anleitung um über SSH ohne Passwort zuzugreifen:
+# https://github.com/toafez/Tutorials/blob/main/SSH-Key_Linux_Kommandozeile.md
+# ==========================================================================
+# Versionen
+# v1.0 - Grundversion von https://github.com/deltapapa01 auf Basis von diesem Script: https://ugreen-forum.de/forum/thread/1692-tut-cronicle-aufgabenplaner-f%C3%BCr-cronjobs/?postID=27149#post27149
+# v2.0 - Logfile hinzugefügt -> Credit: Tommes from https://github.com/toafez
+# ==========================================================================
+# Mit Unterstützung von:
+# https://ugreen-forum.de/
+# https://www.facebook.com/groups/ugreennasyncdebenutzergruppe/
+# https://deltapapa.de/
+# ==========================================================================
 
 #Sollte das Script nicht mit Sudo aufgerufen werden, bricht es ab:
 if [ "$EUID" -ne 0 ]; then
@@ -23,16 +38,16 @@ logfile="${absolute_path}/exporter.log"
 echo "$(timestamp) - starte PaperlessNGX-Exporter" | tee -a "${logfile}"
 
 # Name des Containers
-CONTAINER_NAME="Paperless-ngx"
+CONTAINER_NAME="PaperlessNgx"
 
 # Pfad zum Exportverzeichnis
 BACKUP_DIR="/usr/src/paperless/export"
 
 # Anzahl der zu behaltenden Sicherungen
-KEEP_COUNT=3
+KEEP_COUNT=7
 
 # Pfad zum Verzeichnis, welches bereinigt werden soll:
-TARGET_DIR="/volume1/docker/paperless-ngx/export"
+TARGET_DIR="/volume1/docker/paperlessngx-mdb/export"
 
 # sollte das Verzeichnis zum Export nicht existieren, wird es erstellt:
 echo "Prüfe, ob das Verzeichnis $BACKUP_DIR exisiert, erstelle dieses bei Bedarf..." | tee -a "${logfile}"
