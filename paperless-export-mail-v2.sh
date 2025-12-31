@@ -18,7 +18,7 @@ COPYRIGHT_LINE="Copyright Roman Glos $(date +%Y)"
 #   10 02 * * * /volume2/docker/paperless-ngx/scripts/paperless-export_with_mail.sh
 #
 # Optional: ENV-Datei explizit setzen:
-#   ENV_FILE=/volume2/docker/paperless-ngx/paperlessngx.env ./scripts/paperless-export_with_mail.sh
+	ENV_FILE=/volume1/docker/paperlessngx-mdb/paperlessngx.env /volume1/tools/scripts/paperlessngx/export.sh
 
 set -Eeuo pipefail
 
