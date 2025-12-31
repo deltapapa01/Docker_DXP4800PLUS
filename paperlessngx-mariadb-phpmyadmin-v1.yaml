@@ -1,12 +1,14 @@
-# docker-compose Datei für Paperless-ngx mit Redis 8 und MariaDB 12
-# =================================================================================
-# WICHTIG:
-# - Optimiert für UGREEN NAS, getestet auf UGREEN DXP4800Plus mit UGOS Pro 1.12.0.0095
-# - Diese Datei wird von Docker-Compose eingelesen und setzt Umgebungsvariablen
-# - Eine entsprechende paperlessngx.env Datei mit sensiblen Daten wird benötigt
-# - Werte mit Sonderzeichen am besten in Anführungszeichen setzen:  PASS="abc!?_%"
-# - Datei schützen: chmod 600 paperlessngx.env
-# - Verzeichnisstruktur sollte wie folgt aussehen:
+# Paperless-ngx:latest inklusive Redis 8 und MariaDB 12 auf UGREEN NAS
+# Basiert auf: https://github.com/toafez/Tutorials
+# DACH Ugreen.Forum: https://ugreen-forum.de/forum/thread/1578-paperless-ngx-in-docker/?postID=22780#post22780
+# Credit an https://ugreen-forum.de/user/866-tommes/ für die Vorlage und Hilfestellung
+# Version vom 04.12.2025
+# - Anpassung der Pfade für persistente Daten
+# Version vom 23.10.2025
+# - Auslagerung sensibler Daten in paperlessngx.env Datei umgesetzt
+# - Anpassung: Tika und Gotenberg ausgebaut
+#
+# Verzeichnisstruktur sollte wie folgt aussehen:
 #   /docker
 #     /paperlessngx
 #       /data
@@ -15,21 +17,9 @@
 #       /consume
 #       /mariadb
 #       /redisdata
-# =================================================================================
-# Versionen
-# v1 - Grundversion von https://github.com/deltapapa01
-# v2 - Auslagerung sensibler Daten in paperlessngx.env Datei umgesetzt, Anpassung der Pfade für persistente Daten
-# v3 - Tika und Gotenberg entfernt
-# v4 - phpMyAdmin entfernt
-# =================================================================================
-# Mit Credits an:
-# Tommes von https://github.com/toafez/Tutorials
-# Ugreen.Forum: https://ugreen-forum.de/forum/thread/1578-paperless-ngx-in-docker/?postID=22780#post22780
-# Roman Glos von FB UGREEN NAS Community
-# Anleitungen folgen auf https://deltapapa.de/werkstatt
-# =================================================================================
 
 services:
+
 # Redis Container
   broker:
     image: docker.io/library/redis:8
@@ -94,6 +84,29 @@ services:
       # Root-Passwort (nach Bedarf anpassen)
       MYSQL_ROOT_PASSWORD: rootpass
 
+# phpMyAdmin Container 
+  phpmyadmin:
+    image: phpmyadmin:latest
+
+    # Containername (nach Bedarf anpassen)
+    container_name: PaperlessNgx-phpMyAdmin
+    restart: unless-stopped
+
+    # Sicherheitsoptionen
+    security_opt:
+      - no-new-privileges:true
+
+    # Weiterleitungsport (Port vor dem Doppelpunkt nach Bedarf anpassen)
+    ports:
+      - 2500:80
+
+    # Umgebungsvariablen
+    environment:
+      # Weiterleitungsport an den MariaDB-Container
+      PMA_PORT: 3306
+      # Servicename des MariaDB-Containers
+      PMA_HOST: db
+
 # Paperless-ngx Container
   webserver:
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
@@ -114,6 +127,7 @@ services:
     depends_on:
       - db
       - broker
+      - phpmyadmin
 
     # Gesundheitscheck
     healthcheck:
