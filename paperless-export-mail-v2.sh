@@ -1,5 +1,7 @@
 #!/bin/bash
 # Paperless-ngx Export: document_exporter -> versionierte ZIP-Exports + Retention + optionale Mail (Text + HTML)
+# Aufruf im Terminal // sudo /volume1/tools/scripts/paperlessngx/export.sh
+# Aufruf im Crontab jeden Tag um 02:10 // 10 02 * * * sudo /volume1/tools/scripts/paperlessngx/export.sh
 SCRIPT_VERSION="1.0"
 COPYRIGHT_LINE="Copyright Roman Glos $(date +%Y)"
 
